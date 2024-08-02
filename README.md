@@ -14,25 +14,18 @@ const sap = b.dependency("sap", .{});
 exe.root_module.addImport("sap", sap.module("sap"));
 ```
 
-## How to use
-
-Call the `parseArgs` function, giving as the first argument a tuple of options and as the second argument an allocator.
-It is recommended to use a `std.heap.ArenaAllocator` because the iterator will not be cleaned.
-
-**Note**: you cannot create options named `executable_name` and `positionals`. These names are reserved.
-
-For more information, see the source code or documentation (`zig build docs`).
-
-### Examples
+## Examples
 
 Minimal example:
 ```zig
 const sap = @import("sap");
 
-const args = try sap.parseArgs(.{
+var arg_parser = sap.Parser(.{
     sap.createOption([]const u8, "hello", 'h', "world"),
-}, allocator);
-defer args.positionals.deinit();
+}).init(allocator);
+defer arg_parser.deinit();
+
+const args = try arg_parser.parseArgs();
 
 std.debug.print("Executable name: {s}\n", .{args.executable_name});
 std.debug.print("Positionals:\n", .{});
@@ -43,6 +36,8 @@ std.debug.print("`hello`|`h` arg: {s}\n", .{args.hello});
 ```
 
 You can find more examples in the `examples/` folder.
+
+For more information, see the source code or documentation (`zig build docs`).
 
 ## Features
 

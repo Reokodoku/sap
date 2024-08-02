@@ -1,32 +1,16 @@
 const options = @import("options.zig");
 const parser = @import("parser.zig");
 
+pub const Parser = parser.Parser;
+
 pub const createOption = options.createOption;
 pub const createActionOption = options.createActionOption;
-
-pub const parseArgs = parser.parseArgs;
-pub const parseArgsWithIter = parser.parseArgsWithIter;
 
 // -- TESTS --
 const std = @import("std");
 const testing = std.testing;
 const expect = testing.expect;
 const expectEqualStrings = testing.expectEqualStrings;
-
-const TestArgIter = struct {
-    values: [][:0]const u8,
-    i: usize = 0,
-
-    pub fn next(self: *@This()) ?[:0]const u8 {
-        if (self.i >= self.values.len)
-            return null;
-
-        const val = self.values[self.i];
-        self.i += 1;
-
-        return val;
-    }
-};
 
 var testHelpInvoked = false;
 fn testHelpFn() void {
@@ -37,7 +21,7 @@ test "generic" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer expect(gpa.deinit() == .ok) catch @panic("TEST FAILED");
 
-    var iter_values = [_][:0]const u8{
+    var array_values = [_][:0]const u8{
         "./test",
         "--foo",
         "--bar",
@@ -53,9 +37,8 @@ test "generic" {
         "-e=hello",
         "-e=world",
     };
-    var iter: TestArgIter = .{ .values = &iter_values };
 
-    var args = try parseArgsWithIter(.{
+    var arg_parser = Parser(.{
         createOption(?bool, "foo", null, null),
         createOption([]const u8, "bar", 'b', "FOO"),
         createOption(?[]const u8, "hello", null, null),
@@ -66,8 +49,10 @@ test "generic" {
         createOption(bool, "loop", 'l', false),
         createOption(?enum { hello, world }, "enum", 'e', null),
         createActionOption("help", null, &testHelpFn),
-    }, gpa.allocator(), &iter);
-    defer args.positionals.deinit();
+    }).initWithArray(gpa.allocator(), &array_values);
+    defer arg_parser.deinit();
+
+    var args = try arg_parser.parseArgs();
 
     try expectEqualStrings(args.executable_name, "./test");
     try expect(args.positionals.items.len == 2);

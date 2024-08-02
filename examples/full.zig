@@ -14,7 +14,7 @@ pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(gpa.allocator());
     defer arena.deinit();
 
-    var args = try sap.parseArgs(.{
+    var arg_parser = sap.Parser(.{
         sap.createOption(?bool, "foo", null, null),
         sap.createOption([]const u8, "bar", 'b', "FOO"),
         sap.createOption(?[]const u8, "hello", null, null),
@@ -24,9 +24,10 @@ pub fn main() !void {
         sap.createOption(f64, "float", 'f', 434.0412),
         sap.createOption(enum { zig, language }, "enum", 'e', .zig),
         sap.createActionOption("help", null, &helpFn),
-    }, arena.allocator());
-    defer args.positionals.deinit();
+    }).init(arena.allocator());
+    defer arg_parser.deinit();
 
+    const args = try arg_parser.parseArgs();
     const stdout = std.io.getStdOut().writer();
 
     try stdout.print("Full struct: {any}\n\n", .{args});

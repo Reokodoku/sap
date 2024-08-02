@@ -61,100 +61,149 @@ fn ParsedOptions(comptime options: anytype) type {
 }
 
 /// `options` must not have options named `executable_name` and `positionals`. These names are reserved.
-/// You must call `positionals.deinit()` to clean up allocated resources.
-/// This function doesn't call `deinit()` of `iter`.
-/// Also, it is recommended to use a `std.heap.ArenaAllocator` (unless you are only targetting POSIX
-/// platforms).
-pub fn parseArgs(comptime options: anytype, allocator: std.mem.Allocator) !ParsedOptions(options) {
-    var argsIter = try std.process.argsWithAllocator(allocator);
+/// You must call `deinit()` to clean up allocated resources.
+pub fn Parser(comptime options: anytype) type {
+    return struct {
+        const Self = @This();
 
-    return parseArgsWithIter(options, allocator, &argsIter);
-}
+        parsed: ParsedOptions(options),
+        allocator: std.mem.Allocator,
+        args: union(enum) {
+            std: *std.process.ArgIterator,
+            custom: *struct {
+                values: [][:0]const u8,
+                index: usize = 0,
+            },
 
-/// `options` must not have options named `executable_name` and `positionals`. These names are reserved.
-/// You must call `positionals.deinit()` to clean up allocated resources.
-/// This function doesn't call `deinit()` of `iter`.
-pub fn parseArgsWithIter(comptime options: anytype, allocator: std.mem.Allocator, iter: anytype) !ParsedOptions(options) {
-    var positionals = std.ArrayList([]const u8).init(allocator);
+            fn next(self: *@This()) ?[:0]const u8 {
+                switch (self.*) {
+                    .std => |iter| return iter.next(),
+                    .custom => |iter| {
+                        if (iter.index >= iter.values.len)
+                            return null;
 
-    var parsed: ParsedOptions(options) = .{
-        .executable_name = iter.next().?,
-        .positionals = undefined,
-    };
+                        const val = iter.values[iter.index];
+                        iter.index += 1;
 
-    while (iter.next()) |arg| {
-        if (arg[0] != '-')
-            try positionals.append(arg);
-
-        if (arg[1] == '-') {
-            var split = std.mem.splitScalar(u8, arg[2..], '=');
-            inline for (@typeInfo(@TypeOf(parsed)).Struct.fields[RESERVED_FIELDS..]) |field| {
-                if (eql(u8, field.name, split.first()))
-                    argSetter(&parsed, field, split.rest(), iter);
-                split.reset();
+                        return val;
+                    },
+                }
             }
-        } else {
-            var split = std.mem.splitScalar(u8, arg[1..], '=');
-            inline for (options) |option| {
-                split.reset();
-                if (option.short_name == split.first()[0]) {
-                    inline for (@typeInfo(@TypeOf(parsed)).Struct.fields[RESERVED_FIELDS..]) |field| {
-                        if (eql(u8, field.name, option.name))
-                            argSetter(&parsed, field, split.rest(), iter);
+
+            fn deinit(self: *@This()) void {
+                switch (self.*) {
+                    .std => |iter| iter.deinit(),
+                    .custom => {},
+                }
+            }
+        },
+
+        pub fn init(allocator: std.mem.Allocator) Self {
+            var iter = std.process.argsWithAllocator(allocator) catch @panic("OOM");
+
+            return .{
+                .parsed = undefined,
+                .allocator = allocator,
+                .args = .{ .std = &iter },
+            };
+        }
+
+        pub fn initWithArray(allocator: std.mem.Allocator, args: [][:0]const u8) Self {
+            return .{
+                .parsed = undefined,
+                .allocator = allocator,
+                .args = .{ .custom = @constCast(&.{ .values = args }) },
+            };
+        }
+
+        pub fn deinit(self: *Self) void {
+            self.parsed.positionals.deinit();
+            self.args.deinit();
+        }
+
+        pub fn parseArgs(self: *Self) !ParsedOptions(options) {
+            var positionals = std.ArrayList([]const u8).init(self.allocator);
+
+            self.parsed = .{
+                .executable_name = self.args.next().?,
+                .positionals = undefined,
+            };
+
+            while (self.args.next()) |arg| {
+                if (arg[0] != '-')
+                    try positionals.append(arg);
+
+                if (arg[1] == '-') {
+                    var split = std.mem.splitScalar(u8, arg[2..], '=');
+                    inline for (@typeInfo(@TypeOf(self.parsed)).Struct.fields[RESERVED_FIELDS..]) |field| {
+                        if (eql(u8, field.name, split.first()))
+                            self.argSetter(field, split.rest());
+                        split.reset();
+                    }
+                } else {
+                    var split = std.mem.splitScalar(u8, arg[1..], '=');
+                    inline for (options) |option| {
+                        split.reset();
+                        if (option.short_name == split.first()[0]) {
+                            inline for (@typeInfo(@TypeOf(self.parsed)).Struct.fields[RESERVED_FIELDS..]) |field| {
+                                if (eql(u8, field.name, option.name))
+                                    self.argSetter(field, split.rest());
+                            }
+                        }
                     }
                 }
             }
+
+            self.parsed.positionals = positionals;
+
+            return self.parsed;
         }
-    }
 
-    parsed.positionals = positionals;
+        fn argSetter(self: *Self, field: Type.StructField, equal_str: []const u8) void {
+            // Check if the option is an action option
+            if (@typeInfo(field.type) == .Pointer and @typeInfo(field.type).Pointer.child == fn () void)
+                return @field(self.parsed, field.name)();
 
-    return parsed;
-}
+            if (!eql(u8, equal_str, "")) {
+                @field(self.parsed, field.name) = getValue(field.type, equal_str);
+            } else {
+                if (field.type == ?bool or field.type == bool)
+                    @field(self.parsed, field.name) = true
+                else
+                    @field(self.parsed, field.name) = getValue(field.type, self.args.next());
+            }
+        }
 
-fn argSetter(parsed: anytype, field: Type.StructField, equal_str: []const u8, iter: anytype) void {
-    // Check if the option is an action option
-    if (@typeInfo(field.type) == .Pointer and @typeInfo(field.type).Pointer.child == fn () void)
-        return @field(parsed, field.name)();
+        fn getValue(T: type, val: ?[]const u8) T {
+            switch (T) {
+                ?[]const u8, []const u8 => {
+                    if (val) |v|
+                        return v
+                    else
+                        @panic("String options require a string");
+                },
+                ?bool, bool => {
+                    // Here `bool`s are called only when we pass a non-null string,
+                    // so we can use .? without any problem.
+                    return if (eql(u8, "true", val.?))
+                        true
+                    else if (eql(u8, "false", val.?))
+                        false
+                    else
+                        @panic("Bool options only accept `true` or `false`");
+                },
+                else => {},
+            }
 
-    if (!eql(u8, equal_str, "")) {
-        @field(parsed, field.name) = getValue(field.type, equal_str);
-    } else {
-        if (field.type == ?bool or field.type == bool)
-            @field(parsed, field.name) = true
-        else
-            @field(parsed, field.name) = getValue(field.type, iter.next());
-    }
-}
-
-fn getValue(T: type, val: ?[]const u8) T {
-    switch (T) {
-        ?[]const u8, []const u8 => {
-            if (val) |v|
-                return v
-            else
-                @panic("String options require a string");
-        },
-        ?bool, bool => {
-            // Here `bool`s are called only when we pass a non-null string,
-            // so we can use .? without any problem.
-            return if (eql(u8, "true", val.?))
-                true
-            else if (eql(u8, "false", val.?))
-                false
-            else
-                @panic("Bool options only accept `true` or `false`");
-        },
-        else => {},
-    }
-
-    return if (val) |v| switch (@typeInfo(T)) {
-        .Optional => |i| getValue(i.child, val),
-        .Int => std.fmt.parseInt(T, v, 0) catch @panic("Error when parsing int option"),
-        .Float => std.fmt.parseFloat(T, v) catch @panic("Error when parsing float option"),
-        .Enum => std.meta.stringToEnum(T, v) orelse @panic("Error when parsing enum option: variant doesn't exist"),
-        else => @compileError(@typeName(T) ++ " is not supported"),
-    } else {
-        @panic(@tagName(@typeInfo(T)) ++ " options require a string");
+            return if (val) |v| switch (@typeInfo(T)) {
+                .Optional => |i| getValue(i.child, val),
+                .Int => std.fmt.parseInt(T, v, 0) catch @panic("Error when parsing int option"),
+                .Float => std.fmt.parseFloat(T, v) catch @panic("Error when parsing float option"),
+                .Enum => std.meta.stringToEnum(T, v) orelse @panic("Error when parsing enum option: variant doesn't exist"),
+                else => @compileError(@typeName(T) ++ " is not supported"),
+            } else {
+                @panic(@tagName(@typeInfo(T)) ++ " options require a string");
+            };
+        }
     };
 }

@@ -62,9 +62,9 @@ You can find more examples in the `examples/` folder.
 ## Zig version
 
 sap targets the master branch of zig.
-There is a file called `zig_version` which specifies the latest version of zig in which sap compiles.
+In the `build.zig.zon` file, there is the `minimum_zig_version` field which specifies the latest version of zig in which sap compiles.
 When the zig master branch breaks the compilation, a commit will be merged to:
 
 - fix the compilation errors
-- update the zig version in the `zig_version` file
+- update the `minimum_zig_version` field with the new zig version
 

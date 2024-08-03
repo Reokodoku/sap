@@ -29,10 +29,7 @@ pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer if (gpa.deinit() == .leak) @panic("MEMORY LEAK DETECTED!");
 
-    var arena = std.heap.ArenaAllocator.init(gpa.allocator());
-    defer arena.deinit();
-
-    var arg_parser = sap.Parser(OPTIONS).init(arena.allocator());
+    var arg_parser = sap.Parser(OPTIONS).init(gpa.allocator());
     defer arg_parser.deinit();
 
     const args = try arg_parser.parseArgs();

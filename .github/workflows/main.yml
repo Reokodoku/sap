@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: goto-bus-stop/setup-zig@v2.2.0
-      - run: zig build ${{matrix.step}}
+      - run: zig build ${{matrix.step}} -Doptimize=Debug
   lint:
     runs-on: ubuntu-latest
     steps:

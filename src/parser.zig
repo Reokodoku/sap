@@ -64,30 +64,33 @@ pub fn ParsedOptions(comptime options: anytype) type {
 /// You must call `deinit()` to clean up allocated resources.
 pub fn Parser(comptime options: anytype) type {
     return struct {
+        const CustomArgIterator = struct {
+            values: [][:0]const u8,
+            index: usize = 0,
+
+            pub fn next(self: *CustomArgIterator) ?[:0]const u8 {
+                if (self.index >= self.values.len)
+                    return null;
+
+                const val = self.values[self.index];
+                self.index += 1;
+
+                return val;
+            }
+        };
+
         const Self = @This();
 
         parsed: ParsedOptions(options),
         allocator: std.mem.Allocator,
         args: union(enum) {
             std: *std.process.ArgIterator,
-            custom: *struct {
-                values: [][:0]const u8,
-                index: usize = 0,
-            },
+            custom: *CustomArgIterator,
 
             fn next(self: *@This()) ?[:0]const u8 {
-                switch (self.*) {
-                    .std => |iter| return iter.next(),
-                    .custom => |iter| {
-                        if (iter.index >= iter.values.len)
-                            return null;
-
-                        const val = iter.values[iter.index];
-                        iter.index += 1;
-
-                        return val;
-                    },
-                }
+                return switch (self.*) {
+                    inline else => |iter| iter.next(),
+                };
             }
 
             fn deinit(self: *@This()) void {
@@ -111,10 +114,12 @@ pub fn Parser(comptime options: anytype) type {
         }
 
         pub fn initWithArray(allocator: std.mem.Allocator, args: [][:0]const u8) Self {
+            var iter = CustomArgIterator{ .values = args };
+
             return .{
                 .parsed = undefined,
                 .allocator = allocator,
-                .args = .{ .custom = @constCast(&.{ .values = args }) },
+                .args = .{ .custom = &iter },
             };
         }
 

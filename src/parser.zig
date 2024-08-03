@@ -3,7 +3,7 @@ const eql = std.mem.eql;
 const Type = std.builtin.Type;
 
 const RESERVED_FIELDS = 2;
-fn ParsedOptions(comptime options: anytype) type {
+pub fn ParsedOptions(comptime options: anytype) type {
     const OptionsType = @TypeOf(options);
     const options_type_info = @typeInfo(OptionsType);
 
@@ -98,6 +98,8 @@ pub fn Parser(comptime options: anytype) type {
             }
         },
 
+        action_to_call: ?*const fn (*anyopaque) void = null,
+
         pub fn init(allocator: std.mem.Allocator) Self {
             var iter = std.process.argsWithAllocator(allocator) catch @panic("OOM");
 
@@ -156,13 +158,18 @@ pub fn Parser(comptime options: anytype) type {
 
             self.parsed.positionals = positionals;
 
+            if (self.action_to_call) |func|
+                func(@ptrCast(&self.parsed));
+
             return self.parsed;
         }
 
         fn argSetter(self: *Self, field: Type.StructField, equal_str: []const u8) void {
             // Check if the option is an action option
-            if (@typeInfo(field.type) == .Pointer and @typeInfo(field.type).Pointer.child == fn () void)
-                return @field(self.parsed, field.name)();
+            if (@typeInfo(field.type) == .Pointer and @typeInfo(field.type).Pointer.child == fn (*anyopaque) void) {
+                self.action_to_call = @field(self.parsed, field.name);
+                return;
+            }
 
             if (!eql(u8, equal_str, "")) {
                 @field(self.parsed, field.name) = getValue(field.type, equal_str);

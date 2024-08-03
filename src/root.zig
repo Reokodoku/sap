@@ -1,6 +1,7 @@
 const options = @import("options.zig");
 const parser = @import("parser.zig");
 
+pub const ParsedOptions = parser.ParsedOptions;
 pub const Parser = parser.Parser;
 
 pub const createOption = options.createOption;
@@ -12,8 +13,25 @@ const testing = std.testing;
 const expect = testing.expect;
 const expectEqualStrings = testing.expectEqualStrings;
 
+const OPTIONS = .{
+    createOption(?bool, "foo", null, null),
+    createOption([]const u8, "bar", 'b', "FOO"),
+    createOption(?[]const u8, "hello", null, null),
+    createOption([]const u8, "world", null, "sad"),
+    createOption(u8, "port", null, 2),
+    createOption(i8, "int", null, 0),
+    createOption(f32, "float", null, 3.0),
+    createOption(bool, "loop", 'l', false),
+    createOption(?enum { hello, world }, "enum", 'e', null),
+    createActionOption("help", null, &testHelpFn),
+};
+
 var testHelpInvoked = false;
-fn testHelpFn() void {
+fn testHelpFn(_args: *anyopaque) void {
+    const args: *ParsedOptions(OPTIONS) = @ptrCast(@alignCast(_args));
+
+    expect(args.*.foo == true) catch @panic("TEST FAILED");
+
     testHelpInvoked = true;
 }
 
@@ -38,18 +56,7 @@ test "generic" {
         "-e=world",
     };
 
-    var arg_parser = Parser(.{
-        createOption(?bool, "foo", null, null),
-        createOption([]const u8, "bar", 'b', "FOO"),
-        createOption(?[]const u8, "hello", null, null),
-        createOption([]const u8, "world", null, "sad"),
-        createOption(u8, "port", null, 2),
-        createOption(i8, "int", null, 0),
-        createOption(f32, "float", null, 3.0),
-        createOption(bool, "loop", 'l', false),
-        createOption(?enum { hello, world }, "enum", 'e', null),
-        createActionOption("help", null, &testHelpFn),
-    }).initWithArray(gpa.allocator(), &array_values);
+    var arg_parser = Parser(OPTIONS).initWithArray(gpa.allocator(), &array_values);
     defer arg_parser.deinit();
 
     var args = try arg_parser.parseArgs();

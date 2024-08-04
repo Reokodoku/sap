@@ -77,24 +77,24 @@ pub const ArgIterator = union(enum) {
         }
     };
 
-    std: *std.process.ArgIterator,
-    array: *Array,
+    std: std.process.ArgIterator,
+    array: Array,
 
-    fn first(self: ArgIterator) [:0]const u8 {
-        return switch (self) {
-            inline else => |iter| iter.next().?,
+    fn first(self: *ArgIterator) [:0]const u8 {
+        return switch (self.*) {
+            inline else => |*iter| iter.next().?,
         };
     }
 
-    fn next(self: ArgIterator) ?[:0]const u8 {
-        return switch (self) {
-            inline else => |iter| iter.next(),
+    fn next(self: *ArgIterator) ?[:0]const u8 {
+        return switch (self.*) {
+            inline else => |*iter| iter.next(),
         };
     }
 
-    fn deinit(self: ArgIterator) void {
-        switch (self) {
-            .std => |iter| iter.deinit(),
+    fn deinit(self: *ArgIterator) void {
+        switch (self.*) {
+            .std => |*iter| iter.deinit(),
             .array => {},
         }
     }
@@ -113,18 +113,20 @@ pub fn Parser(comptime options: anytype) type {
         action_to_call: ?*const fn (*anyopaque) void = null,
 
         pub fn init(allocator: Allocator) Self {
-            var iter = std.process.argsWithAllocator(allocator) catch @panic("OOM");
-            return initWithArgIter(allocator, .{ .std = &iter });
+            const iter = std.process.argsWithAllocator(allocator) catch @panic("OOM");
+            return initWithArgIter(allocator, .{ .std = iter });
         }
 
         pub fn initWithArray(allocator: Allocator, args: [][:0]const u8) Self {
-            var iter = ArgIterator.Array{ .values = args };
-            return initWithArgIter(allocator, .{ .array = &iter });
+            return initWithArgIter(allocator, .{ .array = .{ .values = args } });
         }
 
         pub fn initWithArgIter(allocator: Allocator, iter: ArgIterator) Self {
             return .{
-                .parsed = undefined,
+                .parsed = .{
+                    .executable_name = undefined,
+                    .positionals = std.ArrayList([]const u8).init(allocator),
+                },
                 .allocator = allocator,
                 .args = iter,
             };
@@ -136,16 +138,11 @@ pub fn Parser(comptime options: anytype) type {
         }
 
         pub fn parseArgs(self: *Self) !ParsedOptions(options) {
-            var positionals = std.ArrayList([]const u8).init(self.allocator);
-
-            self.parsed = .{
-                .executable_name = self.args.first(),
-                .positionals = undefined,
-            };
+            self.parsed.executable_name = self.args.first();
 
             while (self.args.next()) |arg| {
                 if (arg[0] != '-')
-                    try positionals.append(arg);
+                    try self.parsed.positionals.append(arg);
 
                 if (arg[1] == '-') {
                     var split = std.mem.splitScalar(u8, arg[2..], '=');
@@ -167,8 +164,6 @@ pub fn Parser(comptime options: anytype) type {
                     }
                 }
             }
-
-            self.parsed.positionals = positionals;
 
             if (self.action_to_call) |func|
                 func(@ptrCast(&self.parsed));

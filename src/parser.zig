@@ -1,5 +1,6 @@
 const std = @import("std");
 const eql = std.mem.eql;
+const Allocator = std.mem.Allocator;
 const Type = std.builtin.Type;
 
 const RESERVED_FIELDS = 2;
@@ -60,66 +61,72 @@ pub fn ParsedOptions(comptime options: anytype) type {
     } });
 }
 
+pub const ArgIterator = union(enum) {
+    pub const Array = struct {
+        values: [][:0]const u8,
+        index: usize = 0,
+
+        pub fn next(self: *Array) ?[:0]const u8 {
+            if (self.index >= self.values.len)
+                return null;
+
+            const val = self.values[self.index];
+            self.index += 1;
+
+            return val;
+        }
+    };
+
+    std: *std.process.ArgIterator,
+    array: *Array,
+
+    fn first(self: ArgIterator) [:0]const u8 {
+        return switch (self) {
+            inline else => |iter| iter.next().?,
+        };
+    }
+
+    fn next(self: ArgIterator) ?[:0]const u8 {
+        return switch (self) {
+            inline else => |iter| iter.next(),
+        };
+    }
+
+    fn deinit(self: ArgIterator) void {
+        switch (self) {
+            .std => |iter| iter.deinit(),
+            .array => {},
+        }
+    }
+};
+
 /// `options` must not have options named `executable_name` and `positionals`. These names are reserved.
 /// You must call `deinit()` to clean up allocated resources.
 pub fn Parser(comptime options: anytype) type {
     return struct {
-        const CustomArgIterator = struct {
-            values: [][:0]const u8,
-            index: usize = 0,
-
-            pub fn next(self: *CustomArgIterator) ?[:0]const u8 {
-                if (self.index >= self.values.len)
-                    return null;
-
-                const val = self.values[self.index];
-                self.index += 1;
-
-                return val;
-            }
-        };
-
         const Self = @This();
 
         parsed: ParsedOptions(options),
-        allocator: std.mem.Allocator,
-        args: union(enum) {
-            std: *std.process.ArgIterator,
-            custom: *CustomArgIterator,
-
-            fn next(self: *@This()) ?[:0]const u8 {
-                return switch (self.*) {
-                    inline else => |iter| iter.next(),
-                };
-            }
-
-            fn deinit(self: *@This()) void {
-                switch (self.*) {
-                    .std => |iter| iter.deinit(),
-                    .custom => {},
-                }
-            }
-        },
+        allocator: Allocator,
+        args: ArgIterator,
 
         action_to_call: ?*const fn (*anyopaque) void = null,
 
-        pub fn init(allocator: std.mem.Allocator) Self {
+        pub fn init(allocator: Allocator) Self {
             var iter = std.process.argsWithAllocator(allocator) catch @panic("OOM");
-
-            return .{
-                .parsed = undefined,
-                .allocator = allocator,
-                .args = .{ .std = &iter },
-            };
+            return initWithArgIter(allocator, .{ .std = &iter });
         }
 
-        pub fn initWithArray(allocator: std.mem.Allocator, args: [][:0]const u8) Self {
-            var iter = CustomArgIterator{ .values = args };
+        pub fn initWithArray(allocator: Allocator, args: [][:0]const u8) Self {
+            var iter = ArgIterator.Array{ .values = args };
+            return initWithArgIter(allocator, .{ .array = &iter });
+        }
 
+        pub fn initWithArgIter(allocator: Allocator, iter: ArgIterator) Self {
             return .{
                 .parsed = undefined,
                 .allocator = allocator,
-                .args = .{ .custom = &iter },
+                .args = iter,
             };
         }
 
@@ -132,7 +139,7 @@ pub fn Parser(comptime options: anytype) type {
             var positionals = std.ArrayList([]const u8).init(self.allocator);
 
             self.parsed = .{
-                .executable_name = self.args.next().?,
+                .executable_name = self.args.first(),
                 .positionals = undefined,
             };
 

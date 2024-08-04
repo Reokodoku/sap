@@ -28,8 +28,10 @@ defer arg_parser.deinit();
 const args = try arg_parser.parseArgs();
 
 std.debug.print("Executable name: {s}\n", .{args.executable_name});
+
+var positionals_iter = args.positionals.iterator();
 std.debug.print("Positionals:\n", .{});
-for (args.positionals.items) |str|
+while (positionals_iter.next()) |str|
     std.debug.print("  {s}\n", .{str});
 
 std.debug.print("`hello`|`h` arg: {s}\n", .{args.hello});

@@ -39,8 +39,9 @@ pub fn main() !void {
 
     try stdout.print("Executable name: {s}\n", .{args.executable_name});
 
+    var positionals_iter = args.positionals.iterator();
     try stdout.writeAll("Positionals:\n");
-    for (args.positionals.items) |str|
+    while (positionals_iter.next()) |str|
         try stdout.print("  {s}\n", .{str});
 
     try stdout.print("foo:   {any}\n", .{args.foo});

@@ -143,8 +143,10 @@ pub fn Parser(comptime options: anytype) type {
             self.parsed.executable_name = self.args.first();
 
             while (self.args.next()) |arg| {
-                if (arg[0] != '-')
+                if (arg[0] != '-') {
                     try self.parsed.positionals.array_list.append(arg);
+                    continue;
+                }
 
                 if (arg[1] == '-') {
                     var split = std.mem.splitScalar(u8, arg[2..], '=');

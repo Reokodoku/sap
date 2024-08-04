@@ -3,6 +3,7 @@ const parser = @import("parser.zig");
 
 pub const ParsedOptions = parser.ParsedOptions;
 pub const Parser = parser.Parser;
+pub const ArgIterator = parser.ArgIterator;
 
 pub const createOption = options.createOption;
 pub const createActionOption = options.createActionOption;

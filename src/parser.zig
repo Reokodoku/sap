@@ -3,6 +3,8 @@ const eql = std.mem.eql;
 const Allocator = std.mem.Allocator;
 const Type = std.builtin.Type;
 
+const Positionals = @import("root.zig").Positionals;
+
 const RESERVED_FIELDS = 2;
 pub fn ParsedOptions(comptime options: anytype) type {
     const OptionsType = @TypeOf(options);
@@ -22,10 +24,10 @@ pub fn ParsedOptions(comptime options: anytype) type {
     };
     fields[1] = .{
         .name = "positionals",
-        .type = std.ArrayList([]const u8),
+        .type = Positionals,
         .default_value = null,
         .is_comptime = false,
-        .alignment = @alignOf(std.ArrayList([]const u8)),
+        .alignment = @alignOf(Positionals),
     };
 
     for (options) |option| {
@@ -125,7 +127,7 @@ pub fn Parser(comptime options: anytype) type {
             return .{
                 .parsed = .{
                     .executable_name = undefined,
-                    .positionals = std.ArrayList([]const u8).init(allocator),
+                    .positionals = Positionals.init(allocator),
                 },
                 .allocator = allocator,
                 .args = iter,
@@ -142,7 +144,7 @@ pub fn Parser(comptime options: anytype) type {
 
             while (self.args.next()) |arg| {
                 if (arg[0] != '-')
-                    try self.parsed.positionals.append(arg);
+                    try self.parsed.positionals.array_list.append(arg);
 
                 if (arg[1] == '-') {
                     var split = std.mem.splitScalar(u8, arg[2..], '=');

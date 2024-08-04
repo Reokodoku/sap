@@ -4,6 +4,7 @@ const parser = @import("parser.zig");
 pub const ParsedOptions = parser.ParsedOptions;
 pub const Parser = parser.Parser;
 pub const ArgIterator = parser.ArgIterator;
+pub const Positionals = @import("Positionals.zig");
 
 pub const createOption = options.createOption;
 pub const createActionOption = options.createActionOption;
@@ -63,10 +64,13 @@ test "generic" {
     var args = try arg_parser.parseArgs();
 
     try expectEqualStrings(args.executable_name, "./test");
-    try expect(args.positionals.items.len == 2);
-    try expectEqualStrings(args.positionals.pop(), "btw");
-    try expectEqualStrings(args.positionals.pop(), "linux");
-    try expect(args.positionals.popOrNull() == null);
+    try expect(args.positionals.array_list.items.len == 2);
+
+    var positionals_iter = args.positionals.iterator();
+
+    try expectEqualStrings(positionals_iter.first(), "linux");
+    try expectEqualStrings(positionals_iter.next().?, "btw");
+    try expect(positionals_iter.next() == null);
 
     try expect(args.foo == true);
     try expectEqualStrings(args.bar, "123");

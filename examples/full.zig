@@ -2,15 +2,15 @@ const std = @import("std");
 const sap = @import("sap");
 
 const OPTIONS = .{
-    sap.createOption(?bool, "foo", null, null),
-    sap.createOption([]const u8, "bar", 'b', "FOO"),
-    sap.createOption(?[]const u8, "hello", null, null),
-    sap.createOption([]const u8, "world", null, "sad"),
-    sap.createOption(bool, "loop", 'l', false),
-    sap.createOption(u8, "port", 'p', 255),
-    sap.createOption(f64, "float", 'f', 434.0412),
-    sap.createOption(enum { zig, language }, "enum", 'e', .zig),
-    sap.createActionOption("help", null, &helpFn),
+    sap.flag(?bool, "foo", null, null),
+    sap.flag([]const u8, "bar", 'b', "FOO"),
+    sap.flag(?[]const u8, "hello", null, null),
+    sap.flag([]const u8, "world", null, "sad"),
+    sap.flag(bool, "loop", 'l', false),
+    sap.flag(u8, "port", 'p', 255),
+    sap.flag(f64, "float", 'f', 434.0412),
+    sap.flag(enum { zig, language }, "enum", 'e', .zig),
+    sap.actionFlag("help", null, &helpFn),
 };
 
 fn helpFn(_args: *anyopaque) noreturn {

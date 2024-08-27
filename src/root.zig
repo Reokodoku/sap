@@ -1,4 +1,4 @@
-const options = @import("options.zig");
+const flags = @import("flags.zig");
 const parser = @import("parser.zig");
 
 pub const ParsedOptions = parser.ParsedOptions;
@@ -6,8 +6,8 @@ pub const Parser = parser.Parser;
 pub const ArgIterator = parser.ArgIterator;
 pub const Positionals = @import("Positionals.zig");
 
-pub const createOption = options.createOption;
-pub const createActionOption = options.createActionOption;
+pub const flag = flags.flag;
+pub const actionFlag = flags.actionFlag;
 
 // -- TESTS --
 const std = @import("std");
@@ -16,16 +16,16 @@ const expect = testing.expect;
 const expectEqualStrings = testing.expectEqualStrings;
 
 const OPTIONS = .{
-    createOption(?bool, "foo", null, null),
-    createOption([]const u8, "bar", 'b', "FOO"),
-    createOption(?[]const u8, "hello", null, null),
-    createOption([]const u8, "world", null, "sad"),
-    createOption(u8, "port", null, 2),
-    createOption(i8, "int", null, 0),
-    createOption(f32, "float", null, 3.0),
-    createOption(bool, "loop", 'l', false),
-    createOption(?enum { hello, world }, "enum", 'e', null),
-    createActionOption("help", null, &testHelpFn),
+    flag(?bool, "foo", null, null),
+    flag([]const u8, "bar", 'b', "FOO"),
+    flag(?[]const u8, "hello", null, null),
+    flag([]const u8, "world", null, "sad"),
+    flag(u8, "port", null, 2),
+    flag(i8, "int", null, 0),
+    flag(f32, "float", null, 3.0),
+    flag(bool, "loop", 'l', false),
+    flag(?enum { hello, world }, "enum", 'e', null),
+    actionFlag("help", null, &testHelpFn),
 };
 
 var testHelpInvoked = false;

@@ -1,6 +1,6 @@
 # sap
 
-sap is a simple argument parser library for zig that uses a tuple of options to create a struct containing the value of the arguments.
+sap is a simple argument parser library for zig that uses a tuple of flags to create a struct containing the value of the arguments.
 
 ## How to add the library
 
@@ -21,7 +21,7 @@ Minimal example:
 const sap = @import("sap");
 
 var arg_parser = sap.Parser(.{
-    sap.createOption([]const u8, "hello", 'h', "world"),
+    sap.flag([]const u8, "hello", 'h', "world"),
 }).init(allocator);
 defer arg_parser.deinit();
 
@@ -34,7 +34,7 @@ std.debug.print("Positionals:\n", .{});
 while (positionals_iter.next()) |str|
     std.debug.print("  {s}\n", .{str});
 
-std.debug.print("`hello`|`h` arg: {s}\n", .{args.hello});
+std.debug.print("`hello`|`h` flag value: {s}\n", .{args.hello});
 ```
 
 You can find more examples in the `examples/` folder.
@@ -46,8 +46,8 @@ For more information, see the source code or documentation (`zig build docs`).
 * short arguments
 * long arguments
 * pass values after an equal (`--foo=bar`) or a space (`--foo bar`)
-* options can be specified multiple times
-* options that call a function
+* flags can be specified multiple times
+* flags that call a function
 * supported types:
     * booleans
     * strings

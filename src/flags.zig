@@ -1,4 +1,4 @@
-pub fn createOption(comptime T: type, comptime name: []const u8, comptime short_name: ?u8, comptime default_value: T) struct {
+pub fn flag(comptime T: type, comptime name: []const u8, comptime short_name: ?u8, comptime default_value: T) struct {
     name: []const u8,
     short_name: ?u8,
     default_value: T,
@@ -12,7 +12,7 @@ pub fn createOption(comptime T: type, comptime name: []const u8, comptime short_
 
 /// When this option is specified, the parser calls the provided function.
 /// The first parameter of `func` is a `ParsedOptions` pointer.
-pub fn createActionOption(comptime name: []const u8, comptime short_name: ?u8, func: *const fn (*anyopaque) void) struct {
+pub fn actionFlag(comptime name: []const u8, comptime short_name: ?u8, func: *const fn (*anyopaque) void) struct {
     name: []const u8,
     short_name: ?u8,
     func: *const fn (*anyopaque) void,

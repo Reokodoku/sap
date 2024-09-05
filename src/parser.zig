@@ -10,7 +10,7 @@ pub fn ParsedOptions(comptime options: anytype) type {
     const OptionsType = @TypeOf(options);
     const options_type_info = @typeInfo(OptionsType);
 
-    if (options_type_info != .Struct or !options_type_info.Struct.is_tuple)
+    if (options_type_info != .@"struct" or !options_type_info.@"struct".is_tuple)
         @compileError("Expected tuple, found " ++ @typeName(OptionsType));
 
     var i: usize = RESERVED_FIELDS;
@@ -55,7 +55,7 @@ pub fn ParsedOptions(comptime options: anytype) type {
         i += 1;
     }
 
-    return @Type(.{ .Struct = .{
+    return @Type(.{ .@"struct" = .{
         .layout = .auto,
         .fields = &fields,
         .decls = &.{},
@@ -150,7 +150,7 @@ pub fn Parser(comptime options: anytype) type {
 
                 if (arg[1] == '-') {
                     var split = std.mem.splitScalar(u8, arg[2..], '=');
-                    inline for (@typeInfo(@TypeOf(self.parsed)).Struct.fields[RESERVED_FIELDS..]) |field| {
+                    inline for (@typeInfo(@TypeOf(self.parsed)).@"struct".fields[RESERVED_FIELDS..]) |field| {
                         if (eql(u8, field.name, split.first()))
                             self.argSetter(field, split.rest());
                         split.reset();
@@ -160,7 +160,7 @@ pub fn Parser(comptime options: anytype) type {
                     inline for (options) |option| {
                         split.reset();
                         if (option.short_name == split.first()[0]) {
-                            inline for (@typeInfo(@TypeOf(self.parsed)).Struct.fields[RESERVED_FIELDS..]) |field| {
+                            inline for (@typeInfo(@TypeOf(self.parsed)).@"struct".fields[RESERVED_FIELDS..]) |field| {
                                 if (eql(u8, field.name, option.name))
                                     self.argSetter(field, split.rest());
                             }
@@ -177,7 +177,7 @@ pub fn Parser(comptime options: anytype) type {
 
         fn argSetter(self: *Self, field: Type.StructField, equal_str: []const u8) void {
             // Check if the option is an action option
-            if (@typeInfo(field.type) == .Pointer and @typeInfo(field.type).Pointer.child == fn (*anyopaque) void) {
+            if (@typeInfo(field.type) == .pointer and @typeInfo(field.type).pointer.child == fn (*anyopaque) void) {
                 self.action_to_call = @field(self.parsed, field.name);
                 return;
             }
@@ -214,10 +214,10 @@ pub fn Parser(comptime options: anytype) type {
             }
 
             return if (val) |v| switch (@typeInfo(T)) {
-                .Optional => |i| getValue(i.child, val),
-                .Int => std.fmt.parseInt(T, v, 0) catch @panic("Error when parsing int option"),
-                .Float => std.fmt.parseFloat(T, v) catch @panic("Error when parsing float option"),
-                .Enum => std.meta.stringToEnum(T, v) orelse @panic("Error when parsing enum option: variant doesn't exist"),
+                .optional => |i| getValue(i.child, val),
+                .int => std.fmt.parseInt(T, v, 0) catch @panic("Error when parsing int option"),
+                .float => std.fmt.parseFloat(T, v) catch @panic("Error when parsing float option"),
+                .@"enum" => std.meta.stringToEnum(T, v) orelse @panic("Error when parsing enum option: variant doesn't exist"),
                 else => @compileError(@typeName(T) ++ " is not supported"),
             } else {
                 @panic(@tagName(@typeInfo(T)) ++ " options require a string");

@@ -18,14 +18,14 @@ pub fn ParsedOptions(comptime options: anytype) type {
     fields[0] = .{
         .name = "executable_name",
         .type = []const u8,
-        .default_value = null,
+        .default_value_ptr = null,
         .is_comptime = false,
         .alignment = @alignOf([]const u8),
     };
     fields[1] = .{
         .name = "positionals",
         .type = Positionals,
-        .default_value = null,
+        .default_value_ptr = null,
         .is_comptime = false,
         .alignment = @alignOf(Positionals),
     };
@@ -37,7 +37,7 @@ pub fn ParsedOptions(comptime options: anytype) type {
             fields[i] = .{
                 .name = option.name ++ "",
                 .type = FieldType,
-                .default_value = @ptrCast(&option.func),
+                .default_value_ptr = @ptrCast(&option.func),
                 .is_comptime = false,
                 .alignment = @alignOf(FieldType),
             };
@@ -47,7 +47,7 @@ pub fn ParsedOptions(comptime options: anytype) type {
             fields[i] = .{
                 .name = option.name ++ "",
                 .type = FieldType,
-                .default_value = @ptrCast(&option.default_value),
+                .default_value_ptr = @ptrCast(&option.default_value),
                 .is_comptime = false,
                 .alignment = @alignOf(FieldType),
             };
